@@ -1,0 +1,386 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ==================== ENUMS ====================
+
+enum RoleName {
+  SOLICITANTE
+  GESTOR
+  ADMINISTRADOR
+  RESPONSAVEL_TECNICO
+  SUPORTE
+}
+
+enum UserStatus {
+  ATIVO
+  INATIVO
+  BLOQUEADO
+}
+
+enum EnvironmentType {
+  SALA
+  LABORATORIO
+  AUDITORIO
+  SALA_REUNIAO
+  ESTUDIO
+  MULTIUSO
+}
+
+enum Criticality {
+  COMUM
+  CONTROLADO
+  RESTRITO
+}
+
+enum ResourceKind {
+  FIXO
+  OPCIONAL
+}
+
+enum ReservationStatus {
+  SOLICITADA
+  PENDENTE_APROVACAO
+  PENDENTE_ANALISE_TECNICA
+  APROVADA
+  RECUSADA
+  CANCELADA
+  EM_USO
+  ENCERRADA
+  NO_SHOW
+}
+
+enum RecurrenceFrequency {
+  SEMANAL
+  QUINZENAL
+}
+
+enum BlockReason {
+  MANUTENCAO
+  LIMPEZA
+  EVENTO_INSTITUCIONAL
+  AULA_FIXA
+  OUTRO
+}
+
+enum OccurrenceType {
+  DANO
+  INCIDENTE
+  ATRASO
+  FALHA_TECNICA
+  LIMPEZA
+  OUTRO
+}
+
+enum PenaltyReason {
+  NO_SHOW
+  CANCELAMENTO_TARDIO
+  DANO
+  INCIDENTE
+  OUTRO
+}
+
+enum SupportType {
+  TI
+  AUDIOVISUAL
+  TECNICO_LABORATORIO
+}
+
+enum SupportStatus {
+  ABERTA
+  ACEITA
+  RECUSADA
+  EM_ANDAMENTO
+  CONCLUIDA
+}
+
+// ==================== USER / ROLE ====================
+
+model User {
+  id           String     @id @default(uuid())
+  name         String
+  email        String     @unique
+  passwordHash String
+  role         RoleName
+  status       UserStatus @default(ATIVO)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  reservationsRequested Reservation[]        @relation("RequestedBy")
+  reservationsResponsible Reservation[]      @relation("ResponsibleUser")
+  approvals             Reservation[]        @relation("ApprovedBy")
+  participations        ReservationParticipant[]
+  occurrences           Occurrence[]         @relation("OccurrenceReportedBy")
+  penaltiesReceived      Penalty[]            @relation("PenaltyUser")
+  penaltiesApplied        Penalty[]            @relation("PenaltyAppliedBy")
+  supportRequestsCreated  SupportRequest[]     @relation("SupportRequestedBy")
+  supportRequestsAssigned SupportRequest[]     @relation("SupportAssignedTo")
+  scheduleBlocksCreated   ScheduleBlock[]      @relation("BlockCreatedBy")
+  auditLogs               AuditLog[]
+
+  @@index([email])
+  @@index([role])
+}
+
+// ==================== ENVIRONMENT ====================
+
+model Environment {
+  id            String          @id @default(uuid())
+  code          String          @unique
+  name          String
+  type          EnvironmentType
+  campus        String
+  building      String
+  floor         String
+  location      String?
+  capacity      Int
+  criticality   Criticality     @default(COMUM)
+  active        Boolean         @default(true)
+  requiresTechnicalResponsible Boolean @default(false)
+  technicalNotes String?
+  openingTime   String          @default("07:00")
+  closingTime   String          @default("22:00")
+  setupBufferMinutes   Int      @default(0)
+  cleanupBufferMinutes Int      @default(0)
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  rules         EnvironmentRule[]
+  resources     EnvironmentResource[]
+  reservations  Reservation[]
+  scheduleBlocks ScheduleBlock[]
+
+  @@index([type])
+  @@index([campus, building])
+}
+
+model EnvironmentRule {
+  id                  String   @id @default(uuid())
+  environmentId       String
+  environment         Environment @relation(fields: [environmentId], references: [id], onDelete: Cascade)
+  minAdvanceMinutes   Int      @default(60)
+  maxAdvanceDays       Int      @default(60)
+  maxDurationMinutes   Int      @default(240)
+  requiresApproval     Boolean  @default(true)
+  requiresTechnicalReview Boolean @default(false)
+  allowedRoles         String[] @default([])
+  createdAt            DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@index([environmentId])
+}
+
+// ==================== RESOURCE ====================
+
+model Resource {
+  id          String       @id @default(uuid())
+  name        String
+  kind        ResourceKind @default(OPCIONAL)
+  quantity    Int          @default(1)
+  active      Boolean      @default(true)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  environments EnvironmentResource[]
+  reservations ReservationResource[]
+}
+
+model EnvironmentResource {
+  id            String   @id @default(uuid())
+  environmentId String
+  resourceId    String
+  environment   Environment @relation(fields: [environmentId], references: [id], onDelete: Cascade)
+  resource      Resource    @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+  mandatory     Boolean  @default(false)
+
+  @@unique([environmentId, resourceId])
+}
+
+// ==================== RESERVATION ====================
+
+model ReservationChain {
+  id          String   @id @default(uuid())
+  title       String
+  createdById String
+  createdAt   DateTime @default(now())
+
+  reservations Reservation[]
+}
+
+model RecurringReservation {
+  id            String   @id @default(uuid())
+  frequency     RecurrenceFrequency
+  daysOfWeek    Int[]
+  startDate     DateTime
+  endDate       DateTime
+  startTime     String
+  endTime       String
+  createdById   String
+  createdAt     DateTime @default(now())
+
+  reservations  Reservation[]
+}
+
+model Reservation {
+  id                String             @id @default(uuid())
+  code              String             @unique @default(uuid())
+  environmentId     String
+  environment       Environment        @relation(fields: [environmentId], references: [id])
+
+  requestedById     String
+  requestedBy       User               @relation("RequestedBy", fields: [requestedById], references: [id])
+
+  responsibleId     String
+  responsible       User               @relation("ResponsibleUser", fields: [responsibleId], references: [id])
+
+  approvedById      String?
+  approvedBy        User?              @relation("ApprovedBy", fields: [approvedById], references: [id])
+
+  chainId           String?
+  chain             ReservationChain?  @relation(fields: [chainId], references: [id])
+
+  recurringId       String?
+  recurring         RecurringReservation? @relation(fields: [recurringId], references: [id])
+
+  purpose           String
+  participantsCount Int
+  date              DateTime
+  startTime         DateTime
+  endTime           DateTime
+
+  status            ReservationStatus  @default(SOLICITADA)
+  rejectionReason   String?
+  cancellationReason String?
+  cancelledById     String?
+
+  termsAccepted     Boolean            @default(false)
+
+  checkInAt         DateTime?
+  checkOutAt        DateTime?
+  checkoutChecklist Json?
+
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+
+  participants      ReservationParticipant[]
+  resources         ReservationResource[]
+  occurrences        Occurrence[]
+  penalties          Penalty[]
+  supportRequests     SupportRequest[]
+
+  @@index([environmentId, date])
+  @@index([status])
+  @@index([requestedById])
+}
+
+model ReservationParticipant {
+  id            String      @id @default(uuid())
+  reservationId String
+  reservation   Reservation @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+  userId        String?
+  name          String
+  email         String?
+  user          User?       @relation(fields: [userId], references: [id])
+
+  @@index([reservationId])
+}
+
+model ReservationResource {
+  id            String      @id @default(uuid())
+  reservationId String
+  resourceId    String
+  quantity      Int         @default(1)
+  reservation   Reservation @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+  resource      Resource    @relation(fields: [resourceId], references: [id])
+
+  @@unique([reservationId, resourceId])
+}
+
+// ==================== SCHEDULE BLOCK ====================
+
+model ScheduleBlock {
+  id            String      @id @default(uuid())
+  environmentId String
+  environment   Environment @relation(fields: [environmentId], references: [id], onDelete: Cascade)
+  reason        BlockReason
+  description   String?
+  startDateTime DateTime
+  endDateTime   DateTime
+  createdById   String
+  createdBy     User        @relation("BlockCreatedBy", fields: [createdById], references: [id])
+  createdAt     DateTime    @default(now())
+
+  @@index([environmentId, startDateTime, endDateTime])
+}
+
+// ==================== OCCURRENCE / PENALTY / SUPPORT ====================
+
+model Occurrence {
+  id            String         @id @default(uuid())
+  reservationId String
+  reservation   Reservation    @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+  type          OccurrenceType
+  description   String
+  reportedById  String
+  reportedBy    User           @relation("OccurrenceReportedBy", fields: [reportedById], references: [id])
+  createdAt     DateTime       @default(now())
+
+  @@index([reservationId])
+}
+
+model Penalty {
+  id             String        @id @default(uuid())
+  userId         String
+  user           User          @relation("PenaltyUser", fields: [userId], references: [id])
+  reservationId  String?
+  reservation    Reservation?  @relation(fields: [reservationId], references: [id])
+  reason         PenaltyReason
+  description    String?
+  blockedUntil   DateTime?
+  appliedById    String
+  appliedBy      User          @relation("PenaltyAppliedBy", fields: [appliedById], references: [id])
+  createdAt      DateTime      @default(now())
+
+  @@index([userId])
+}
+
+model SupportRequest {
+  id            String        @id @default(uuid())
+  reservationId String
+  reservation   Reservation   @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+  type          SupportType
+  description   String
+  status        SupportStatus @default(ABERTA)
+  requestedById String
+  requestedBy   User          @relation("SupportRequestedBy", fields: [requestedById], references: [id])
+  assignedToId  String?
+  assignedTo    User?         @relation("SupportAssignedTo", fields: [assignedToId], references: [id])
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@index([reservationId])
+  @@index([status])
+}
+
+// ==================== AUDIT ====================
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  userId     String?
+  user       User?    @relation(fields: [userId], references: [id])
+  action     String
+  entity     String
+  entityId   String?
+  before     Json?
+  after      Json?
+  createdAt  DateTime @default(now())
+
+  @@index([entity, entityId])
+  @@index([userId])
+  @@index([createdAt])
+}
