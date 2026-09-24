@@ -28,13 +28,22 @@ function RequesterDashboard() {
     reservationService
       .list({ mine: "true" })
       .then(setReservations)
+      .catch((err) => console.error("Erro ao carregar reservas:", err))
       .finally(() => setLoading(false));
   }, []);
 
   if (loading) return <LoadingState />;
 
   const now = new Date();
-  const upcoming = reservations.filter((r) => new Date(r.startTime) >= now && r.status === "APROVADA");
+  
+  const upcoming = reservations.filter((r) => {
+    if (r.status !== "APROVADA") return false;
+    // Correção do Bug: Combina a data e a hora para criar um objeto Date válido
+    const dataBase = String(r.date).split('T')[0];
+    const dataReserva = new Date(`${dataBase}T${r.startTime}`);
+    return dataReserva >= now;
+  });
+
   const pending = reservations.filter((r) => ["PENDENTE_APROVACAO", "PENDENTE_ANALISE_TECNICA", "SOLICITADA"].includes(r.status));
   const inUse = reservations.filter((r) => r.status === "EM_USO");
 
@@ -69,7 +78,7 @@ function RequesterDashboard() {
             {reservations.slice(0, 5).map((r) => (
               <li key={r.id} className="flex items-center justify-between py-3">
                 <div>
-                  <p className="text-sm font-medium text-slate-700">{r.environment.name}</p>
+                  <p className="text-sm font-medium text-slate-700">{r.environment?.name || 'Ambiente'}</p>
                   <p className="text-xs text-slate-400">
                     {formatDate(r.date)} · {formatTime(r.startTime)} - {formatTime(r.endTime)}
                   </p>
@@ -89,17 +98,24 @@ function ManagementDashboard() {
   const [overview, setOverview] = useState<ReportOverview | null>(null);
   const [pending, setPending] = useState<Reservation[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
 
   useEffect(() => {
+    // Correção do Bug: Adicionado o .catch para não travar a tela em caso de falha na API
     Promise.all([reportService.overview(), reservationService.pendingApprovals()])
       .then(([o, p]) => {
         setOverview(o);
         setPending(p);
       })
+      .catch((err) => {
+        console.error("Erro ao carregar dados administrativos:", err);
+        setError(true);
+      })
       .finally(() => setLoading(false));
   }, []);
 
-  if (loading || !overview) return <LoadingState />;
+  if (loading) return <LoadingState />;
+  if (error || !overview) return <div className="py-8 text-center text-red-500">Erro ao carregar as informações do dashboard. Verifique a conexão com o banco.</div>;
 
   return (
     <div className="flex flex-col gap-6">
@@ -137,7 +153,7 @@ function ManagementDashboard() {
               <li key={r.id} className="flex items-center justify-between py-3">
                 <div>
                   <p className="text-sm font-medium text-slate-700">
-                    {r.environment.name} · {r.requestedBy.name}
+                    {r.environment?.name || 'Ambiente'} · {r.requestedBy?.name || 'Usuário'}
                   </p>
                   <p className="text-xs text-slate-400">
                     {formatDate(r.date)} · {formatTime(r.startTime)} - {formatTime(r.endTime)}

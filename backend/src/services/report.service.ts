@@ -30,8 +30,8 @@ export const reportService = {
 
     const byEnvironment = await prisma.reservation.groupBy({
       by: ["environmentId"],
-      _count: { _all: true },
-      orderBy: { _count: { _all: "desc" } },
+      _count: { id: true },
+      orderBy: { _count: { id: "desc" } },
       take: 5,
     });
 
@@ -41,12 +41,12 @@ export const reportService = {
 
     const mostUsedEnvironments = byEnvironment.map((b) => ({
       environment: environments.find((e) => e.id === b.environmentId),
-      total: b._count._all,
+      total: b._count.id,
     }));
 
     const byStatus = await prisma.reservation.groupBy({
       by: ["status"],
-      _count: { _all: true },
+      _count: { id: true },
     });
 
     return {
@@ -64,7 +64,7 @@ export const reportService = {
       occupancyRate:
         totalReservations > 0 ? Number((((approved + inUse + closed) / totalReservations) * 100).toFixed(1)) : 0,
       mostUsedEnvironments,
-      byStatus: byStatus.map((s) => ({ status: s.status, total: s._count._all })),
+      byStatus: byStatus.map((s) => ({ status: s.status, total: s._count.id })),
     };
   },
 };
