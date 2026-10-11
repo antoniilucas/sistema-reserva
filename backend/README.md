@@ -1,17 +1,16 @@
-# Backend — Sistema de Reserva de Salas e Laboratórios
+# Backend
 
-API REST em Node.js + Express + TypeScript + Prisma + PostgreSQL.
+API REST em Node.js, Express, TypeScript, Prisma e PostgreSQL.
 
-Consulte o README na raiz do projeto para instruções completas de instalação, configuração de `.env`, migrations, seed e execução.
+Siga o [guia de configuração da raiz](../README.md#configuração-e-execução) para iniciar o banco, criar `backend/.env`, instalar dependências e iniciar a aplicação. A referência de fluxos e endpoints está no [guia do sistema](../docs/guia-do-sistema.md).
 
-Resumo rápido:
+Comandos usados dentro desta pasta:
 
 ```bash
 npm install
-cp .env.example .env
-npx prisma migrate dev --name init
+npx prisma migrate dev
 npm run seed
 npm run dev
 ```
 
-API disponível em `http://localhost:3000` (rotas sob `/api`, health-check em `/health`).
+A API fica em `http://localhost:3000`; o health check é `GET /health` e as rotas da API usam o prefixo `/api`.

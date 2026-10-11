@@ -11,6 +11,11 @@ export const authController = {
     res.json(result);
   }),
 
+  register: asyncHandler(async (req: Request, res: Response) => {
+    const result = await authService.register(req.body.name, req.body.email, req.body.password);
+    res.status(201).json(result);
+  }),
+
   me: asyncHandler(async (req: Request, res: Response) => {
     if (!req.user) throw new AppError("Não autenticado", 401);
     const user = await userRepository.findById(req.user.id);

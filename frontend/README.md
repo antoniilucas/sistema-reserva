@@ -1,15 +1,14 @@
-# Frontend — Sistema de Reserva de Salas e Laboratórios
+# Frontend
 
-Aplicação React + Vite + TypeScript + Tailwind CSS.
+Aplicação web em React, Vite, TypeScript e Tailwind CSS.
 
-Consulte o README na raiz do projeto para instruções completas.
+Siga o [guia de configuração da raiz](../README.md#configuração-e-execução) para iniciar o banco e o backend, criar `frontend/.env` e executar a aplicação. Os fluxos e perfis estão descritos no [guia do sistema](../docs/guia-do-sistema.md).
 
-Resumo rápido:
+Comandos usados dentro desta pasta:
 
 ```bash
 npm install
-cp .env.example .env
 npm run dev
 ```
 
-Aplicação disponível em `http://localhost:5173`. Certifique-se de que o backend esteja rodando em `http://localhost:3000`.
+A aplicação fica em `http://localhost:5173` e usa a API em `http://localhost:3000` por padrão.

@@ -6,6 +6,7 @@ interface AuthContextData {
   user: User | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
+  register: (name: string, email: string, password: string) => Promise<void>;
   logout: () => void;
 }
 
@@ -45,6 +46,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(loggedUser);
   }
 
+  async function register(name: string, email: string, password: string) {
+    const { token, user: registeredUser } = await authService.register(name, email, password);
+    localStorage.setItem("@reserva:token", token);
+    localStorage.setItem("@reserva:user", JSON.stringify(registeredUser));
+    setUser(registeredUser);
+  }
+
   function logout() {
     localStorage.removeItem("@reserva:token");
     localStorage.removeItem("@reserva:user");
@@ -52,6 +60,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout }}>{children}</AuthContext.Provider>
+    <AuthContext.Provider value={{ user, loading, login, register, logout }}>{children}</AuthContext.Provider>
   );
 }
