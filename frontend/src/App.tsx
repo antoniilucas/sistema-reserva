@@ -3,6 +3,7 @@ import { ProtectedRoute } from "./routes/ProtectedRoute";
 import { DashboardLayout } from "./layouts/DashboardLayout";
 
 import Login from "./pages/Login";
+import Register from "./pages/Register";
 import Dashboard from "./pages/Dashboard";
 import NewReservation from "./pages/NewReservation";
 import MyReservations from "./pages/MyReservations";
@@ -24,6 +25,7 @@ export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
+      <Route path="/cadastro" element={<Register />} />
 
       <Route element={<ProtectedRoute />}>
         <Route element={<DashboardLayout />}>

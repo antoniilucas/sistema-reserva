@@ -77,6 +77,11 @@ export default function Login() {
           </button>
         </form>
 
+        <p className="mt-5 text-center text-sm text-slate-500">
+          Ainda não tem acesso?{" "}
+          <a href="/cadastro" className="font-semibold text-brand-600 hover:text-brand-700">Cadastre-se</a>
+        </p>
+
         <div className="mt-6 rounded-lg bg-slate-50 p-3 text-xs text-slate-400">
           <p className="font-medium text-slate-500">Credenciais de teste:</p>
           <p>admin@sistema.com · gestor@sistema.com · usuario@sistema.com</p>
