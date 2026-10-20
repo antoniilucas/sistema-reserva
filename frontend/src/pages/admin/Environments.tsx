@@ -24,6 +24,8 @@ const emptyForm = {
   openingTime: "07:00",
   closingTime: "22:00",
   requiresTechnicalResponsible: false,
+  requiresApproval: true,
+  requiresTechnicalReview: false,
 };
 
 // Função auxiliar para escolher um ícone baseado no tipo de ambiente
@@ -84,6 +86,8 @@ export default function EnvironmentsAdmin() {
       openingTime: env.openingTime,
       closingTime: env.closingTime,
       requiresTechnicalResponsible: env.requiresTechnicalResponsible,
+      requiresApproval: env.rules[0]?.requiresApproval ?? true,
+      requiresTechnicalReview: env.rules[0]?.requiresTechnicalReview ?? false,
     });
     setModalOpen(true);
   }
@@ -91,14 +95,16 @@ export default function EnvironmentsAdmin() {
   async function handleSave() {
     setSaving(true);
     try {
+      const { requiresApproval, requiresTechnicalReview, ...environmentData } = form;
+      const payload = {
+        ...environmentData,
+        rule: { requiresApproval, requiresTechnicalReview },
+      };
       if (editing) {
-        await environmentService.update(editing.id, form);
+        await environmentService.update(editing.id, payload);
         toast.success("Ambiente atualizado com sucesso.");
       } else {
-        await environmentService.create({
-          ...form,
-          rule: { requiresApproval: true },
-        });
+        await environmentService.create(payload);
         toast.success("Ambiente criado com sucesso.");
       }
       setModalOpen(false);
@@ -316,6 +322,30 @@ export default function EnvironmentsAdmin() {
             <div>
               <p className="text-sm font-bold text-slate-800">Exige Responsável Técnico</p>
               <p className="text-xs text-slate-500 mt-0.5">Obrigatório para laboratórios com equipamentos delicados.</p>
+            </div>
+          </label>
+          <label className="col-span-1 sm:col-span-2 flex items-center gap-3 p-4 border border-slate-200 rounded-xl bg-slate-50/50 cursor-pointer hover:bg-indigo-50/50 hover:border-indigo-200 transition-colors">
+            <input
+              type="checkbox"
+              className="h-5 w-5 rounded text-indigo-600 focus:ring-indigo-600"
+              checked={form.requiresApproval}
+              onChange={(e) => setForm({ ...form, requiresApproval: e.target.checked })}
+            />
+            <div>
+              <p className="text-sm font-bold text-slate-800">Exige aprovação de gestor</p>
+              <p className="mt-0.5 text-xs text-slate-500">Desmarque para aprovar automaticamente quando não houver análise técnica.</p>
+            </div>
+          </label>
+          <label className="col-span-1 sm:col-span-2 flex items-center gap-3 p-4 border border-slate-200 rounded-xl bg-slate-50/50 cursor-pointer hover:bg-indigo-50/50 hover:border-indigo-200 transition-colors">
+            <input
+              type="checkbox"
+              className="h-5 w-5 rounded text-indigo-600 focus:ring-indigo-600"
+              checked={form.requiresTechnicalReview}
+              onChange={(e) => setForm({ ...form, requiresTechnicalReview: e.target.checked })}
+            />
+            <div>
+              <p className="text-sm font-bold text-slate-800">Exige análise técnica</p>
+              <p className="mt-0.5 text-xs text-slate-500">Solicitações passam pelo responsável técnico antes da aprovação de gestor.</p>
             </div>
           </label>
         </div>

@@ -119,6 +119,7 @@ export interface Penalty {
   reason: string;
   description?: string;
   blockedUntil?: string;
+  cancelledAt?: string | null;
   createdAt: string;
 }
 

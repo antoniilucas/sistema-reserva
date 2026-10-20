@@ -342,6 +342,7 @@ model Penalty {
   reason         PenaltyReason
   description    String?
   blockedUntil   DateTime?
+  cancelledAt    DateTime?
   appliedById    String
   appliedBy      User          @relation("PenaltyAppliedBy", fields: [appliedById], references: [id])
   createdAt      DateTime      @default(now())

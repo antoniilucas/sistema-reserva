@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { CalendarSearch, CheckCircle2, Search } from "lucide-react";
 import { Card } from "../components/Card";
@@ -11,14 +11,17 @@ import { reservationService } from "../services/reservation.service";
 import { Environment } from "../types";
 import { environmentTypeLabels } from "../utils/format";
 import { getErrorMessage } from "../services/api";
+import { formatDateTime, formatTime } from "../utils/format";
 
 export default function NewReservation() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const initialSearch = location.state as { date?: string; startTime?: string; endTime?: string } | null;
   const [step, setStep] = useState(1);
 
-  const [date, setDate] = useState("");
-  const [startTime, setStartTime] = useState("");
-  const [endTime, setEndTime] = useState("");
+  const [date, setDate] = useState(initialSearch?.date || "");
+  const [startTime, setStartTime] = useState(initialSearch?.startTime || "");
+  const [endTime, setEndTime] = useState(initialSearch?.endTime || "");
   const [environmentType, setEnvironmentType] = useState("");
 
   const [searching, setSearching] = useState(false);
@@ -37,6 +40,10 @@ export default function NewReservation() {
   async function handleSearch() {
     if (!date || !startTime || !endTime) {
       toast.error("Preencha data, horário inicial e final.");
+      return;
+    }
+    if (endTime <= startTime) {
+      toast.error("O horário final deve ser depois do horário inicial.");
       return;
     }
     setSearching(true);
@@ -61,12 +68,13 @@ export default function NewReservation() {
 
   function selectEnvironment(env: Environment) {
     setSelectedEnvironment(env);
+    setSelectedResources([]);
     setStep(3);
   }
 
   async function handleSubmit() {
     if (!selectedEnvironment) return;
-    if (!purpose || participantsCount < 1) {
+    if (!purpose.trim() || purpose.trim().length < 3 || participantsCount < 1) {
       toast.error("Preencha a finalidade e o número de participantes.");
       return;
     }
@@ -95,10 +103,17 @@ export default function NewReservation() {
         purpose,
         participantsCount,
         participants,
-        resources: selectedResources.map((resourceId) => ({ resourceId })),
+        resources: selectedEnvironment.resources
+          .filter(({ resource, mandatory }) => mandatory || selectedResources.includes(resource.id))
+          .map(({ resource }) => ({ resourceId: resource.id })),
         termsAccepted,
       });
-      toast.success(`Reserva ${created.status === "APROVADA" ? "aprovada automaticamente" : "solicitada"} com sucesso!`);
+      const confirmation = created.status === "APROVADA"
+        ? "Reserva aprovada automaticamente."
+        : created.status === "PENDENTE_ANALISE_TECNICA"
+          ? "Reserva enviada para análise técnica."
+          : "Solicitação enviada para aprovação.";
+      toast.success(confirmation);
       navigate("/reservas");
     } catch (err) {
       toast.error(getErrorMessage(err));
@@ -175,7 +190,7 @@ export default function NewReservation() {
                     {suggestions.map((s, idx) => (
                       <li key={idx} className="rounded-lg border border-slate-100 p-3 text-sm">
                         <span className="font-medium">{s.environment.name}</span> ·{" "}
-                        {new Date(s.startTime).toLocaleString("pt-BR")} até {new Date(s.endTime).toLocaleTimeString("pt-BR")}
+                        {formatDateTime(s.startTime)} até {formatTime(s.endTime)}
                       </li>
                     ))}
                   </ul>
@@ -282,11 +297,13 @@ export default function NewReservation() {
 
             <div className="rounded-lg bg-amber-50 p-3 text-xs text-amber-700">
               Status esperado:{" "}
-              {selectedEnvironment.rules[0]?.requiresTechnicalReview
-                ? "Pendente de análise técnica"
+              {selectedEnvironment.requiresTechnicalResponsible || selectedEnvironment.rules[0]?.requiresTechnicalReview
+                ? selectedEnvironment.rules[0]?.requiresApproval
+                  ? "Análise técnica e aprovação de gestor"
+                  : "Análise técnica"
                 : selectedEnvironment.rules[0]?.requiresApproval
-                ? "Pendente de aprovação"
-                : "Aprovação automática"}
+                  ? "Aprovação de gestor"
+                  : "Aprovação automática"}
             </div>
 
             <div className="flex justify-end">

@@ -35,7 +35,8 @@ export default function MyReservations({ historyMode = false }: { historyMode?: 
   async function load() {
     setLoading(true);
     try {
-      const params: Record<string, string> = { mine: "true" };
+      const params: Record<string, string> = {};
+      if (user?.role === "SOLICITANTE") params.mine = "true";
       if (statusFilter) params.status = statusFilter;
       const data = await reservationService.list(params);
       setReservations(historyMode ? data.filter((r) => ["ENCERRADA", "CANCELADA", "RECUSADA", "NO_SHOW"].includes(r.status)) : data);
@@ -49,7 +50,7 @@ export default function MyReservations({ historyMode = false }: { historyMode?: 
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [statusFilter]);
+  }, [statusFilter, user?.role]);
 
   async function handleCancel() {
     if (!cancelTarget || !cancelReason) {

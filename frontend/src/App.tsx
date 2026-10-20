@@ -48,8 +48,11 @@ export default function App() {
             <Route path="/relatorios" element={<Reports />} />
           </Route>
 
-          <Route element={<ProtectedRoute allowedRoles={["ADMINISTRADOR"]} />}>
+          <Route element={<ProtectedRoute allowedRoles={["ADMINISTRADOR", "GESTOR"]} />}>
             <Route path="/usuarios" element={<UsersAdmin />} />
+          </Route>
+
+          <Route element={<ProtectedRoute allowedRoles={["ADMINISTRADOR"]} />}>
             <Route path="/ambientes" element={<EnvironmentsAdmin />} />
             <Route path="/recursos" element={<ResourcesAdmin />} />
             <Route path="/bloqueios" element={<BlocksAdmin />} />

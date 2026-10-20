@@ -29,3 +29,9 @@ export const updateUserStatusSchema = z.object({
   query: z.any().optional(),
   params: z.any().optional(),
 });
+
+export const updateOwnProfileSchema = z.object({
+  body: z.object({ name: z.string().trim().min(2) }),
+  query: z.any().optional(),
+  params: z.any().optional(),
+});

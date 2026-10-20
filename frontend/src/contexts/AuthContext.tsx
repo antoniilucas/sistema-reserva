@@ -1,12 +1,14 @@
 import { createContext, ReactNode, useEffect, useState } from "react";
 import { User } from "../types";
 import { authService } from "../services/auth.service";
+import { userService } from "../services/user.service";
 
 interface AuthContextData {
   user: User | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
   register: (name: string, email: string, password: string) => Promise<void>;
+  updateName: (name: string) => Promise<void>;
   logout: () => void;
 }
 
@@ -53,6 +55,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(registeredUser);
   }
 
+  async function updateName(name: string) {
+    const updatedUser = await userService.updateOwnProfile(name);
+    localStorage.setItem("@reserva:user", JSON.stringify(updatedUser));
+    setUser(updatedUser);
+  }
+
   function logout() {
     localStorage.removeItem("@reserva:token");
     localStorage.removeItem("@reserva:user");
@@ -60,6 +68,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout }}>{children}</AuthContext.Provider>
+    <AuthContext.Provider value={{ user, loading, login, register, updateName, logout }}>{children}</AuthContext.Provider>
   );
 }

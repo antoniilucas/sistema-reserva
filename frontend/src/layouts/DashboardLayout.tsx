@@ -36,6 +36,7 @@ const gestorMenu = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { to: "/aprovacoes", label: "Solicitações Pendentes", icon: ClipboardCheck },
   { to: "/reservas", label: "Reservas", icon: ListChecks },
+  { to: "/usuarios", label: "Usuários", icon: Users },
   { to: "/historico", label: "Histórico", icon: History },
   { to: "/relatorios", label: "Relatórios", icon: BarChart3 },
   { to: "/perfil", label: "Perfil", icon: UserIcon },
@@ -82,13 +83,23 @@ function menuForRole(role?: string) {
   }
 }
 
+function mobileMenuLabel(label: string) {
+  const labels: Record<string, string> = {
+    Disponibilidade: "Agenda",
+    "Solicitações Pendentes": "Aprovações",
+    "Análises Pendentes": "Análises",
+    "Solicitações de Suporte": "Suporte",
+  };
+  return labels[label] || label.split(" ")[0];
+}
+
 export function DashboardLayout() {
   const { user, logout } = useAuth();
   const menu = menuForRole(user?.role);
 
   return (
     <div className="flex min-h-screen bg-slate-50">
-      <aside className="hidden w-64 shrink-0 flex-col border-r border-slate-100 bg-white px-4 py-6 md:flex">
+      <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col overflow-y-auto border-r border-slate-100 bg-white px-4 py-6 md:flex">
         <div className="mb-8 flex items-center gap-2 px-2">
           <div className="rounded-lg bg-brand-600 p-2 text-white">
             <Building className="h-5 w-5" />
@@ -103,6 +114,7 @@ export function DashboardLayout() {
             <NavLink
               key={item.to}
               to={item.to}
+              end={item.to === "/reservas"}
               className={({ isActive }) =>
                 `flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition ${
                   isActive ? "bg-brand-50 text-brand-700" : "text-slate-500 hover:bg-slate-50 hover:text-slate-800"
@@ -143,22 +155,25 @@ export function DashboardLayout() {
             </div>
           </div>
         </header>
-        <main className="flex-1 px-4 py-6 md:px-8">
+        <main className="min-w-0 flex-1 px-4 py-6 pb-24 md:px-8 md:pb-6">
           <Outlet />
         </main>
       </div>
 
-      <nav className="fixed inset-x-0 bottom-0 z-40 flex justify-around border-t border-slate-100 bg-white py-2 md:hidden">
-        {menu.slice(0, 5).map((item) => (
+      <nav aria-label="Navegação principal" className="fixed inset-x-0 bottom-0 z-40 flex gap-1 overflow-x-auto border-t border-slate-100 bg-white px-2 py-2 md:hidden">
+        {menu.map((item) => (
           <NavLink
             key={item.to}
             to={item.to}
+            end={item.to === "/reservas"}
+            title={item.label}
+            aria-label={item.label}
             className={({ isActive }) =>
-              `flex flex-col items-center gap-1 px-2 text-[10px] ${isActive ? "text-brand-600" : "text-slate-400"}`
+              `flex min-w-[68px] shrink-0 flex-col items-center gap-1 px-2 text-[10px] ${isActive ? "text-brand-600" : "text-slate-400"}`
             }
           >
             <item.icon className="h-5 w-5" />
-            {item.label.split(" ")[0]}
+            <span className="max-w-[76px] truncate">{mobileMenuLabel(item.label)}</span>
           </NavLink>
         ))}
       </nav>

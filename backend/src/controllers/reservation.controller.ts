@@ -80,8 +80,8 @@ export const reservationController = {
     res.json(updated);
   }),
 
-  pendingApprovals: asyncHandler(async (_req: Request, res: Response) => {
-    const pending = await reservationService.pendingApprovals();
+  pendingApprovals: asyncHandler(async (req: Request, res: Response) => {
+    const pending = await reservationService.pendingApprovals(req.user!.role);
     res.json(pending);
   }),
 };

@@ -12,6 +12,37 @@ import { Reservation, ReportOverview } from "../types";
 import { StatusBadge } from "../components/StatusBadge";
 import { formatDate, formatTime } from "../utils/format";
 
+function exportOverviewCsv(overview: ReportOverview) {
+  const rows = [
+    ["Indicador", "Valor"],
+    ["Total de reservas", overview.totalReservations],
+    ["Pendentes", overview.pending],
+    ["Aprovadas", overview.approved],
+    ["Recusadas", overview.rejected],
+    ["Canceladas", overview.cancelled],
+    ["No-show", overview.noShow],
+    ["Em uso", overview.inUse],
+    ["Encerradas", overview.closed],
+    ["Ambientes ativos", overview.activeEnvironments],
+    ["Ocorrências", overview.occurrencesCount],
+    ["Penalidades", overview.penaltiesCount],
+    ["Taxa de ocupação (%)", overview.occupancyRate],
+    [],
+    ["Reservas por status", "Quantidade"],
+    ...overview.byStatus.map((item) => [item.status, item.total]),
+    [],
+    ["Ambientes mais utilizados", "Reservas"],
+    ...overview.mostUsedEnvironments.map((item) => [item.environment?.name || "Ambiente", item.total]),
+  ];
+  const csv = "\uFEFF" + rows.map((row) => row.map((value) => `"${String(value ?? "").replace(/"/g, '""')}"`).join(";")).join("\r\n");
+  const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = `relatorio-reservas-${new Date().toISOString().slice(0, 10)}.csv`;
+  anchor.click();
+  URL.revokeObjectURL(url);
+}
+
 export default function Dashboard() {
   const { user } = useAuth();
 
@@ -42,9 +73,7 @@ function RequesterDashboard() {
   const now = new Date();
   const upcoming = reservations.filter((r) => {
     if (r.status !== "APROVADA") return false;
-    const dataBase = String(r.date).split('T')[0];
-    const dataReserva = new Date(`${dataBase}T${r.startTime}`);
-    return dataReserva >= now;
+    return new Date(r.startTime) >= now;
   });
 
   const pending = reservations.filter((r) => ["PENDENTE_APROVACAO", "PENDENTE_ANALISE_TECNICA", "SOLICITADA"].includes(r.status));
@@ -140,10 +169,12 @@ function ManagementDashboard() {
         </div>
         
         <div className="flex items-center gap-3">
-          <button className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold py-2.5 px-4 rounded-xl shadow-md transition-colors">
-            <Plus className="h-4 w-4" /> Novo Ambiente
-          </button>
-          <button className="flex items-center gap-2 bg-purple-50 border border-purple-200 hover:bg-purple-100 text-purple-700 text-sm font-semibold py-2.5 px-4 rounded-xl transition-colors shadow-sm">
+          {user?.role === "ADMINISTRADOR" && (
+            <Link to="/ambientes" className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold py-2.5 px-4 rounded-xl shadow-md transition-colors">
+              <Plus className="h-4 w-4" /> Novo Ambiente
+            </Link>
+          )}
+          <button onClick={() => exportOverviewCsv(overview)} className="flex items-center gap-2 bg-purple-50 border border-purple-200 hover:bg-purple-100 text-purple-700 text-sm font-semibold py-2.5 px-4 rounded-xl transition-colors shadow-sm">
             <Download className="h-4 w-4" /> Exportar Relatório
           </button>
         </div>
@@ -189,7 +220,7 @@ function ManagementDashboard() {
           <div className="flex justify-between items-start">
             <div>
               <p className="text-sm font-semibold text-slate-700">Ambientes ativos</p>
-              <p className="text-3xl font-black text-slate-900 mt-1">{overview.activeEnvironments || 5}</p>
+              <p className="text-3xl font-black text-slate-900 mt-1">{overview.activeEnvironments}</p>
             </div>
             <div className="h-10 w-10 rounded-xl bg-blue-50 flex items-center justify-center shadow-[0_0_20px_rgba(59,130,246,0.4)]">
               <Building2 className="h-5 w-5 text-blue-600" />
@@ -205,7 +236,7 @@ function ManagementDashboard() {
           <div className="flex justify-between items-start">
             <div>
               <p className="text-sm font-semibold text-slate-700">Ocupação</p>
-              <p className="text-3xl font-black text-slate-900 mt-1">{overview.occupancyRate || '33.3'}%</p>
+              <p className="text-3xl font-black text-slate-900 mt-1">{overview.occupancyRate}%</p>
             </div>
             <div className="flex items-center gap-2">
               <svg className="h-6 w-12 text-emerald-400 opacity-60" viewBox="0 0 50 20" fill="none">
@@ -322,13 +353,6 @@ function ManagementDashboard() {
                 </div>
                 
                 <div className="flex items-center gap-6">
-                  {/* Avatares Mockados (Design Premium) */}
-                  <div className="hidden sm:flex items-center -space-x-2">
-                    <img className="w-8 h-8 rounded-full border-2 border-white object-cover shadow-sm" src="https://i.pravatar.cc/100?img=11" alt="" />
-                    <img className="w-8 h-8 rounded-full border-2 border-white object-cover shadow-sm" src="https://i.pravatar.cc/100?img=33" alt="" />
-                    <img className="w-8 h-8 rounded-full border-2 border-white object-cover shadow-sm" src="https://i.pravatar.cc/100?img=47" alt="" />
-                  </div>
-                  
                   <div className="scale-90">
                     <StatusBadge status={r.status} />
                   </div>

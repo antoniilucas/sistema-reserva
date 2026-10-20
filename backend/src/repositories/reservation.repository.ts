@@ -49,10 +49,22 @@ export const reservationRepository = {
         endTime: { gt: start },
       },
     }),
-  pending: () =>
+  pending: (statuses?: ReservationStatus[]) =>
     prisma.reservation.findMany({
-      where: { status: { in: ["PENDENTE_APROVACAO", "PENDENTE_ANALISE_TECNICA"] } },
+      where: { status: { in: statuses ?? ["PENDENTE_APROVACAO", "PENDENTE_ANALISE_TECNICA"] } },
       include: fullInclude,
       orderBy: { createdAt: "asc" },
     }),
+  findOverdueApproved: (startedBefore: Date) =>
+    prisma.reservation.findMany({
+      where: { status: "APROVADA", startTime: { lte: startedBefore } },
+      select: { id: true },
+    }),
+  markNoShowIfApproved: async (id: string) => {
+    const result = await prisma.reservation.updateMany({
+      where: { id, status: "APROVADA" },
+      data: { status: "NO_SHOW" },
+    });
+    return result.count === 1 ? reservationRepository.findById(id) : null;
+  },
 };

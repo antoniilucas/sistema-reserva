@@ -57,12 +57,12 @@ export default function Login() {
 
           <div>
             <h1 className="text-4xl lg:text-5xl font-bold text-white mb-6 tracking-tight leading-tight">
-              Gerencie seus espaços <br />
-              com precisão.
+              Faça suas reservas <br />
+              de salas e laboratórios.
             </h1>
             <p className="text-lg text-slate-300 max-w-md font-medium leading-relaxed">
-              Acesse a plataforma para controlar salas, laboratórios e recursos
-              do seu ambiente de forma inteligente.
+              Acesse a plataforma para reservar salas e laboratórios de forma
+              simples e inteligente.
             </p>
           </div>
         </div>

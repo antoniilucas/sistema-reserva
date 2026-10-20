@@ -38,7 +38,7 @@ export default function Support() {
   async function load() {
     setLoading(true);
     try {
-      const params = isTeam ? {} : { mine: "true" };
+      const params: Record<string, string> = isTeam ? {} : { mine: "true" };
       const data = await supportService.list(params);
       setRequests(data);
     } catch (err) {

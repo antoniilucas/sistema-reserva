@@ -13,8 +13,10 @@ import { reservationService } from "../services/reservation.service";
 import { Reservation } from "../types";
 import { formatDate, formatTime } from "../utils/format";
 import { getErrorMessage } from "../services/api";
+import { useAuth } from "../hooks/useAuth";
 
 export default function Approvals() {
+  const { user } = useAuth();
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<Reservation | null>(null);
@@ -41,8 +43,10 @@ export default function Approvals() {
   async function handleApprove(r: Reservation) {
     setProcessing(true);
     try {
-      await reservationService.approve(r.id);
-      toast.success("Reserva aprovada.");
+      const updated = await reservationService.approve(r.id);
+      toast.success(updated.status === "PENDENTE_APROVACAO"
+        ? "Análise técnica concluída; encaminhada para aprovação do gestor."
+        : "Reserva aprovada.");
       load();
     } catch (err) {
       toast.error(getErrorMessage(err));
@@ -72,7 +76,16 @@ export default function Approvals() {
 
   return (
     <div className="flex flex-col gap-6">
-      <h1 className="text-xl font-semibold text-slate-800">Solicitações Pendentes</h1>
+      <div>
+        <h1 className="text-xl font-semibold text-slate-800">
+          {user?.role === "RESPONSAVEL_TECNICO" ? "Análises técnicas pendentes" : "Solicitações pendentes"}
+        </h1>
+        <p className="mt-1 text-sm text-slate-500">
+          {user?.role === "RESPONSAVEL_TECNICO"
+            ? "Revise os requisitos técnicos dos ambientes antes de encaminhar a solicitação."
+            : "Aprove ou recuse solicitações que aguardam a decisão de um gestor."}
+        </p>
+      </div>
 
       {loading ? (
         <LoadingState />
@@ -138,6 +151,11 @@ export default function Approvals() {
             <p><span className="font-medium">Finalidade:</span> {selected.purpose}</p>
             <p><span className="font-medium">Participantes:</span> {selected.participantsCount} / capacidade {selected.environment.capacity}</p>
             <p><span className="font-medium">Responsável:</span> {selected.responsible.name}</p>
+            {selected.status === "PENDENTE_ANALISE_TECNICA" && (
+              <p className="rounded bg-amber-50 p-2 text-xs text-amber-700">
+                Após a análise técnica, esta solicitação seguirá para aprovação do gestor quando exigido pelas regras do ambiente.
+              </p>
+            )}
             {selected.resources && selected.resources.length > 0 && (
               <p>
                 <span className="font-medium">Recursos:</span> {selected.resources.map((r) => r.resource.name).join(", ")}

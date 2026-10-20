@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { PlusCircle, ShieldAlert, AlertTriangle, Clock, Gavel, UserX, AlertCircle, Ban } from "lucide-react";
+import { PlusCircle, ShieldAlert, AlertTriangle, Clock, Gavel, UserX, AlertCircle, Ban, Pencil, XCircle } from "lucide-react";
 import { Button } from "../../components/Button";
 import { Input, Select, Textarea } from "../../components/Input";
 import { Table, Thead } from "../../components/Table";
@@ -69,6 +69,7 @@ export default function PenaltiesAdmin() {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
+  const [editingPenalty, setEditingPenalty] = useState<Penalty | null>(null);
   const [form, setForm] = useState({ userId: "", reason: "NO_SHOW", description: "", blockedUntil: "" });
   const [saving, setSaving] = useState(false);
 
@@ -108,6 +109,51 @@ export default function PenaltiesAdmin() {
     }
   }
 
+  function openEdit(penalty: Penalty) {
+    setEditingPenalty(penalty);
+    const blockedUntil = penalty.blockedUntil ? new Date(penalty.blockedUntil) : null;
+    if (blockedUntil) blockedUntil.setMinutes(blockedUntil.getMinutes() - blockedUntil.getTimezoneOffset());
+    setForm({
+      userId: penalty.userId,
+      reason: penalty.reason,
+      description: penalty.description || "",
+      blockedUntil: blockedUntil?.toISOString().slice(0, 16) || "",
+    });
+    setModalOpen(true);
+  }
+
+  async function handleSave() {
+    if (!editingPenalty) return;
+    setSaving(true);
+    try {
+      await penaltyService.update(editingPenalty.id, {
+        userId: form.userId,
+        reason: form.reason,
+        description: form.description,
+        blockedUntil: form.blockedUntil ? new Date(form.blockedUntil).toISOString() : null,
+      });
+      toast.success("Penalidade atualizada.");
+      setModalOpen(false);
+      setEditingPenalty(null);
+      load();
+    } catch (error) {
+      toast.error(getErrorMessage(error));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleCancel(penalty: Penalty) {
+    if (!confirm("Cancelar esta penalidade? O registro será mantido no histórico.")) return;
+    try {
+      await penaltyService.cancel(penalty.id);
+      toast.success("Penalidade cancelada.");
+      load();
+    } catch (error) {
+      toast.error(getErrorMessage(error));
+    }
+  }
+
   return (
     <div className="flex flex-col gap-8 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-10">
       
@@ -118,7 +164,7 @@ export default function PenaltiesAdmin() {
           <p className="text-sm font-medium text-slate-500 mt-1">Gira infrações e bloqueios temporários de utilizadores no sistema.</p>
         </div>
         <button 
-          onClick={() => setModalOpen(true)}
+          onClick={() => { setEditingPenalty(null); setForm({ userId: "", reason: "NO_SHOW", description: "", blockedUntil: "" }); setModalOpen(true); }}
           className="flex items-center justify-center gap-2 bg-rose-600 hover:bg-rose-700 text-white font-semibold rounded-xl py-2.5 px-5 transition-all shadow-md"
         >
           <Gavel className="h-4 w-4" /> Aplicar Penalidade
@@ -149,6 +195,7 @@ export default function PenaltiesAdmin() {
                 <th className="py-4 px-6 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Detalhes</th>
                 <th className="py-4 px-6 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Período de Bloqueio</th>
                 <th className="py-4 px-6 text-right text-xs font-bold text-slate-500 uppercase tracking-wider">Data do Registo</th>
+                <th className="py-4 px-6 text-right text-xs font-bold text-slate-500 uppercase tracking-wider">Ações</th>
               </tr>
             </Thead>
             <tbody className="divide-y divide-slate-100">
@@ -156,7 +203,7 @@ export default function PenaltiesAdmin() {
                 const isBlocked = p.blockedUntil && new Date(p.blockedUntil) > new Date();
                 
                 return (
-                  <tr key={p.id} className="group hover:bg-slate-50/50 transition-colors">
+                  <tr key={p.id} className={`group hover:bg-slate-50/50 transition-colors ${p.cancelledAt ? "opacity-60" : ""}`}>
                     
                     {/* Utilizador (Avatar + Nome) */}
                     <td className="py-4 px-6">
@@ -172,7 +219,10 @@ export default function PenaltiesAdmin() {
                     
                     {/* Motivo (Crachá) */}
                     <td className="py-4 px-6">
-                      {getReasonBadge(p.reason)}
+                      <div className="flex flex-col items-start gap-1.5">
+                        {getReasonBadge(p.reason)}
+                        {p.cancelledAt && <span className="text-[10px] font-bold uppercase text-slate-500">Cancelada</span>}
+                      </div>
                     </td>
 
                     {/* Descrição */}
@@ -200,6 +250,16 @@ export default function PenaltiesAdmin() {
                     <td className="py-4 px-6 text-right text-sm font-medium text-slate-500">
                       {formatDateTime(p.createdAt)}
                     </td>
+                    <td className="py-4 px-6 text-right whitespace-nowrap">
+                      {!p.cancelledAt && <>
+                        <button onClick={() => openEdit(p)} className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-semibold text-indigo-600 hover:bg-indigo-50" aria-label="Editar penalidade">
+                          <Pencil className="h-3.5 w-3.5" /> Editar
+                        </button>
+                        <button onClick={() => handleCancel(p)} className="ml-2 inline-flex items-center gap-1 rounded-lg border border-rose-200 px-2.5 py-1.5 text-xs font-semibold text-rose-600 hover:bg-rose-50" aria-label="Cancelar penalidade">
+                          <XCircle className="h-3.5 w-3.5" /> Cancelar
+                        </button>
+                      </>}
+                    </td>
                     
                   </tr>
                 );
@@ -213,14 +273,14 @@ export default function PenaltiesAdmin() {
       <Modal
         open={modalOpen}
         onClose={() => setModalOpen(false)}
-        title="Aplicar Nova Penalidade"
+        title={editingPenalty ? "Editar Penalidade" : "Aplicar Nova Penalidade"}
         footer={
           <div className="flex gap-3 justify-end w-full">
             <Button variant="secondary" onClick={() => setModalOpen(false)}>
               Cancelar
             </Button>
-            <Button loading={saving} onClick={handleCreate} className="bg-rose-600 hover:bg-rose-700 text-white">
-              Confirmar Penalidade
+            <Button loading={saving} onClick={editingPenalty ? handleSave : handleCreate} className="bg-rose-600 hover:bg-rose-700 text-white">
+              {editingPenalty ? "Salvar Alterações" : "Confirmar Penalidade"}
             </Button>
           </div>
         }
@@ -236,7 +296,7 @@ export default function PenaltiesAdmin() {
             </div>
           </div>
 
-          <Select 
+          <Select
             label="Utilizador Infrator" 
             value={form.userId} 
             onChange={(e) => setForm({ ...form, userId: e.target.value })}

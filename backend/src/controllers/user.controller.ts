@@ -39,13 +39,32 @@ export const userController = {
     res.status(201).json(sanitize(created));
   }),
 
+  updateOwnProfile: asyncHandler(async (req: Request, res: Response) => {
+    const existing = await userRepository.findById(req.user!.id);
+    if (!existing) throw new AppError("Usuário não encontrado", 404);
+
+    const updated = await userRepository.update(existing.id, { name: req.body.name });
+    await registerAudit({ userId: existing.id, action: "ATUALIZAR_PERFIL", entity: "User", entityId: existing.id, before: sanitize(existing), after: sanitize(updated) });
+    res.json(sanitize(updated));
+  }),
+
   update: asyncHandler(async (req: Request, res: Response) => {
     const existing = await userRepository.findById(req.params.id);
     if (!existing) throw new AppError("Usuário não encontrado", 404);
 
     const { password, ...rest } = req.body;
+    if (req.user!.role === "GESTOR" && ("role" in rest || password)) {
+      throw new AppError("Gestores podem alterar somente nome e e-mail dos usuários", 403);
+    }
     const data: any = { ...rest };
     if (password) data.passwordHash = await bcrypt.hash(password, 10);
+
+    if (data.email) {
+      data.email = data.email.trim().toLowerCase();
+      const emailOwner = await userRepository.findByEmail(data.email);
+      if (emailOwner && emailOwner.id !== existing.id) throw new AppError("E-mail já cadastrado", 409);
+    }
+    if (data.name) data.name = data.name.trim();
 
     const updated = await userRepository.update(req.params.id, data);
     await registerAudit({ userId: req.user!.id, action: "ATUALIZAR", entity: "User", entityId: updated.id, before: sanitize(existing), after: sanitize(updated) });

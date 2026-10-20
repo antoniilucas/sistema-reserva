@@ -37,7 +37,21 @@ export const environmentService = {
   update: async (userId: string, id: string, data: any) => {
     const existing = await environmentService.getById(id);
     const { rule, ...envData } = data;
-    const updated = await environmentRepository.update(id, envData);
+    const ruleData = rule
+      ? existing.rules[0]
+        ? { update: { where: { id: existing.rules[0].id }, data: rule } }
+        : {
+            create: {
+              minAdvanceMinutes: rule.minAdvanceMinutes ?? 60,
+              maxAdvanceDays: rule.maxAdvanceDays ?? 60,
+              maxDurationMinutes: rule.maxDurationMinutes ?? 240,
+              requiresApproval: rule.requiresApproval ?? true,
+              requiresTechnicalReview: rule.requiresTechnicalReview ?? false,
+              allowedRoles: rule.allowedRoles ?? [],
+            },
+          }
+      : undefined;
+    const updated = await environmentRepository.update(id, { ...envData, rules: ruleData });
 
     await registerAudit({
       userId,

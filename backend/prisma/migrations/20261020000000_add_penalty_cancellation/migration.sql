@@ -1,0 +1,1 @@
+ALTER TABLE "Penalty" ADD COLUMN "cancelledAt" TIMESTAMP(3);

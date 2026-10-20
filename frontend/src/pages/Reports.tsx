@@ -46,7 +46,7 @@ export default function Reports() {
           <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">Relatórios e Métricas</h1>
           <p className="text-sm font-medium text-slate-500 mt-1">Análise detalhada do uso dos ambientes e status das reservas.</p>
         </div>
-        <button className="flex items-center gap-2 bg-purple-50 border border-purple-200 hover:bg-purple-100 text-purple-700 text-sm font-semibold py-2.5 px-4 rounded-xl transition-colors shadow-sm">
+        <button onClick={() => window.print()} className="flex items-center gap-2 bg-purple-50 border border-purple-200 hover:bg-purple-100 text-purple-700 text-sm font-semibold py-2.5 px-4 rounded-xl transition-colors shadow-sm">
           <Download className="h-4 w-4" /> Exportar PDF
         </button>
       </div>

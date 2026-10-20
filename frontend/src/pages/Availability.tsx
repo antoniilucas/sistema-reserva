@@ -27,6 +27,10 @@ export default function Availability() {
       toast.error("Preencha data, horário inicial e final.");
       return;
     }
+    if (endTime <= startTime) {
+      toast.error("O horário final deve ser depois do horário inicial.");
+      return;
+    }
     setLoading(true);
     try {
       const result = await availabilityService.search({ date, startTime, endTime, environmentType: environmentType || undefined });
@@ -86,7 +90,7 @@ export default function Availability() {
               </ul>
             )}
             {available.length > 0 && (
-              <Button className="mt-4 w-full" onClick={() => navigate("/reservas/nova")}>
+              <Button className="mt-4 w-full" onClick={() => navigate("/reservas/nova", { state: { date, startTime, endTime } })}>
                 <CalendarSearch className="h-4 w-4" /> Fazer uma reserva
               </Button>
             )}

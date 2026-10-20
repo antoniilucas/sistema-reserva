@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Search, Lock, Unlock, UserPlus } from "lucide-react";
+import { Search, Lock, Unlock, UserPlus, Pencil } from "lucide-react";
 import { Button } from "../../components/Button";
 import { Input, Select } from "../../components/Input";
 import { Table, Thead } from "../../components/Table";
@@ -11,6 +11,7 @@ import { userService } from "../../services/user.service";
 import { User } from "../../types";
 import { roleLabels } from "../../utils/format";
 import { getErrorMessage } from "../../services/api";
+import { useAuth } from "../../hooks/useAuth";
 
 const getInitials = (name: string) => {
   const parts = name.trim().split(" ");
@@ -23,8 +24,10 @@ export default function UsersAdmin() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
+  const [editing, setEditing] = useState<User | null>(null);
   const [form, setForm] = useState({ name: "", email: "", password: "", role: "SOLICITANTE" });
   const [saving, setSaving] = useState(false);
+  const { user: currentUser } = useAuth();
 
   async function load() {
     setLoading(true);
@@ -62,6 +65,42 @@ export default function UsersAdmin() {
     }
   }
 
+  function openEdit(user: User) {
+    setEditing(user);
+    setForm({ name: user.name, email: user.email, password: "", role: user.role });
+    setModalOpen(true);
+  }
+
+  async function handleSave() {
+    if (!form.name.trim() || !form.email.trim()) {
+      toast.error("Informe nome e e-mail.");
+      return;
+    }
+    setSaving(true);
+    try {
+      if (editing) {
+        const payload: Record<string, string> = { name: form.name.trim(), email: form.email.trim() };
+        if (currentUser?.role === "ADMINISTRADOR") {
+          payload.role = form.role;
+          if (form.password) payload.password = form.password;
+        }
+        await userService.update(editing.id, payload);
+        toast.success("Dados do usuário atualizados.");
+      } else {
+        await userService.create(form);
+        toast.success("Usuário criado com sucesso.");
+      }
+      setModalOpen(false);
+      setEditing(null);
+      setForm({ name: "", email: "", password: "", role: "SOLICITANTE" });
+      load();
+    } catch (err) {
+      toast.error(getErrorMessage(err));
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function toggleStatus(user: User) {
     const newStatus = user.status === "ATIVO" ? "BLOQUEADO" : "ATIVO";
     try {
@@ -81,12 +120,12 @@ export default function UsersAdmin() {
           <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">Gestão de Usuários</h1>
           <p className="text-sm font-medium text-slate-500 mt-1">Administre acessos, perfis e credenciais da plataforma.</p>
         </div>
-        <button 
-          onClick={() => setModalOpen(true)}
+        {currentUser?.role === "ADMINISTRADOR" && <button
+          onClick={() => { setEditing(null); setForm({ name: "", email: "", password: "", role: "SOLICITANTE" }); setModalOpen(true); }}
           className="flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-xl py-2.5 px-5 transition-all shadow-md"
         >
           <UserPlus className="h-4 w-4" /> Novo Usuário
-        </button>
+        </button>}
       </div>
 
       <div className="relative max-w-md w-full">
@@ -157,7 +196,13 @@ export default function UsersAdmin() {
                   </td>
 
                   <td className="py-4 px-6 text-right">
-                    <button 
+                    <button
+                      onClick={() => openEdit(u)}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 mr-2 rounded-lg text-xs font-bold border border-slate-200 text-indigo-600 hover:bg-indigo-50"
+                    >
+                      <Pencil className="h-3.5 w-3.5" /> Editar
+                    </button>
+                    {currentUser?.role === "ADMINISTRADOR" && <button
                       onClick={() => toggleStatus(u)} 
                       className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all
                         ${u.status === "ATIVO" 
@@ -170,7 +215,7 @@ export default function UsersAdmin() {
                       ) : (
                         <><Unlock className="h-3.5 w-3.5" /> Reativar</>
                       )}
-                    </button>
+                    </button>}
                   </td>
                 </tr>
               ))}
@@ -182,14 +227,14 @@ export default function UsersAdmin() {
       <Modal
         open={modalOpen}
         onClose={() => setModalOpen(false)}
-        title="Criar Novo Usuário"
+        title={editing ? "Editar Usuário" : "Criar Novo Usuário"}
         footer={
           <div className="flex gap-3 justify-end w-full">
             <Button variant="secondary" onClick={() => setModalOpen(false)}>
               Cancelar
             </Button>
-            <Button loading={saving} onClick={handleCreate}>
-              Confirmar Criação
+            <Button loading={saving} onClick={editing ? handleSave : handleCreate}>
+              {editing ? "Salvar Alterações" : "Confirmar Criação"}
             </Button>
           </div>
         }
@@ -208,14 +253,14 @@ export default function UsersAdmin() {
             value={form.email} 
             onChange={(e) => setForm({ ...form, email: e.target.value })} 
           />
-          <Input 
+          {!editing && <Input
             label="Senha Temporária" 
             type="password" 
             placeholder="••••••••"
             value={form.password} 
             onChange={(e) => setForm({ ...form, password: e.target.value })} 
-          />
-          <Select 
+          />}
+          {(!editing || currentUser?.role === "ADMINISTRADOR") && <Select
             label="Perfil de Acesso" 
             value={form.role} 
             onChange={(e) => setForm({ ...form, role: e.target.value })}
@@ -225,7 +270,7 @@ export default function UsersAdmin() {
                 {label}
               </option>
             ))}
-          </Select>
+          </Select>}
         </div>
       </Modal>
     </div>

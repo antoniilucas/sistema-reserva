@@ -1,16 +1,22 @@
 export function formatDate(value: string | Date): string {
-  const date = new Date(value);
-  return date.toLocaleDateString("pt-BR");
+  if (typeof value === "string") {
+    const datePart = value.slice(0, 10);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(datePart)) {
+      const [year, month, day] = datePart.split("-").map(Number);
+      return new Date(year, month - 1, day).toLocaleDateString("pt-BR");
+    }
+  }
+  return new Date(value).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" });
 }
 
 export function formatDateTime(value: string | Date): string {
   const date = new Date(value);
-  return date.toLocaleString("pt-BR");
+  return date.toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" });
 }
 
 export function formatTime(value: string | Date): string {
   const date = new Date(value);
-  return date.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+  return date.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" });
 }
 
 export const statusLabels: Record<string, string> = {

@@ -1,6 +1,9 @@
-import { Mail, Shield, CheckCircle2, XCircle } from "lucide-react";
+import { FormEvent, useState } from "react";
+import { Mail, Shield, CheckCircle2, XCircle, Pencil, Check, X } from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
 import { roleLabels } from "../utils/format";
+import { toast } from "sonner";
+import { getErrorMessage } from "../services/api";
 
 // Função para extrair iniciais do nome (ex: "Pedro Teixeira" -> "PT")
 const getInitials = (name?: string) => {
@@ -11,7 +14,28 @@ const getInitials = (name?: string) => {
 };
 
 export default function Profile() {
-  const { user } = useAuth();
+  const { user, updateName } = useAuth();
+  const [editingName, setEditingName] = useState(false);
+  const [name, setName] = useState(user?.name || "");
+  const [saving, setSaving] = useState(false);
+
+  async function handleSaveName(event: FormEvent) {
+    event.preventDefault();
+    if (name.trim().length < 2) {
+      toast.error("O nome deve ter pelo menos 2 caracteres.");
+      return;
+    }
+    setSaving(true);
+    try {
+      await updateName(name.trim());
+      setEditingName(false);
+      toast.success("Nome atualizado.");
+    } catch (error) {
+      toast.error(getErrorMessage(error));
+    } finally {
+      setSaving(false);
+    }
+  }
 
   return (
     <div className="flex flex-col gap-8 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-10 max-w-4xl mx-auto w-full">
@@ -44,7 +68,18 @@ export default function Profile() {
                 </div>
               </div>
               <div className="pb-2 mt-2 sm:mt-0">
-                <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">{user?.name || "Usuário"}</h2>
+                {editingName ? (
+                  <form onSubmit={handleSaveName} className="flex flex-wrap items-center gap-2">
+                    <input autoFocus value={name} onChange={(event) => setName(event.target.value)} className="rounded-lg border border-slate-300 px-3 py-2 text-lg font-bold outline-none focus:border-blue-500" aria-label="Nome completo" />
+                    <button disabled={saving} type="submit" className="rounded-lg bg-emerald-600 p-2 text-white disabled:opacity-50" aria-label="Salvar nome"><Check className="h-4 w-4" /></button>
+                    <button type="button" onClick={() => { setName(user?.name || ""); setEditingName(false); }} className="rounded-lg border border-slate-200 p-2 text-slate-500" aria-label="Cancelar edição"><X className="h-4 w-4" /></button>
+                  </form>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">{user?.name || "Usuário"}</h2>
+                    <button type="button" onClick={() => { setName(user?.name || ""); setEditingName(true); }} className="rounded-lg p-2 text-slate-400 hover:bg-blue-50 hover:text-blue-600" aria-label="Editar meu nome"><Pencil className="h-4 w-4" /></button>
+                  </div>
+                )}
                 <p className="text-sm font-bold text-slate-500 mt-1 uppercase tracking-wider">{roleLabels[user?.role || ""] || "Perfil não definido"}</p>
               </div>
             </div>

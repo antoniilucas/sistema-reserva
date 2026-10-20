@@ -164,10 +164,8 @@ export const reservationService = {
     const start = new Date(payload.startDate);
     const end = new Date(payload.endDate);
     const occurrences: Date[] = [];
-    const stepDays = payload.frequency === "QUINZENAL" ? 14 : 7;
-
-    for (let cursor = new Date(start); cursor <= end; cursor.setDate(cursor.getDate() + 1)) {
-      if (payload.daysOfWeek.includes(cursor.getDay())) {
+    for (let cursor = new Date(start); cursor <= end; cursor.setUTCDate(cursor.getUTCDate() + 1)) {
+      if (payload.daysOfWeek.includes(cursor.getUTCDay())) {
         occurrences.push(new Date(cursor));
       }
     }
@@ -175,9 +173,11 @@ export const reservationService = {
     // Para quinzenal, mantém somente semanas alternadas a partir da primeira ocorrência
     let filtered = occurrences;
     if (payload.frequency === "QUINZENAL" && occurrences.length > 0) {
-      const first = occurrences[0].getTime();
-      filtered = occurrences.filter(
-        (d) => Math.round((d.getTime() - first) / (1000 * 60 * 60 * 24)) % stepDays === 0
+      const firstWeek = new Date(occurrences[0]);
+      firstWeek.setUTCDate(firstWeek.getUTCDate() - firstWeek.getUTCDay());
+      const weekMilliseconds = 7 * 24 * 60 * 60 * 1000;
+      filtered = occurrences.filter((date) =>
+        Math.floor((date.getTime() - firstWeek.getTime()) / weekMilliseconds) % 2 === 0
       );
     }
 
@@ -297,7 +297,12 @@ export const reservationService = {
 
   list: (filters: any) => reservationRepository.list(filters),
 
-  pendingApprovals: () => reservationRepository.pending(),
+  pendingApprovals: (role: RoleName) => {
+    if (role === "ADMINISTRADOR") return reservationRepository.pending();
+    if (role === "GESTOR") return reservationRepository.pending(["PENDENTE_APROVACAO"]);
+    if (role === "RESPONSAVEL_TECNICO") return reservationRepository.pending(["PENDENTE_ANALISE_TECNICA"]);
+    return Promise.resolve([]);
+  },
 
   update: async (currentUser: CurrentUser, id: string, payload: any) => {
     const reservation = await reservationService.getById(id);
@@ -364,12 +369,27 @@ export const reservationService = {
 
   approve: async (currentUser: CurrentUser, id: string) => {
     const reservation = await reservationService.getById(id);
-    if (!["PENDENTE_APROVACAO", "PENDENTE_ANALISE_TECNICA"].includes(reservation.status)) {
+    const isTechnicalReview = reservation.status === "PENDENTE_ANALISE_TECNICA";
+    const isManagerApproval = reservation.status === "PENDENTE_APROVACAO";
+    if (!isTechnicalReview && !isManagerApproval) {
       throw new AppError("Reserva não está pendente de aprovação", 400);
     }
 
+    if (isTechnicalReview && !["RESPONSAVEL_TECNICO", "ADMINISTRADOR"].includes(currentUser.role)) {
+      throw new AppError("Esta solicitação precisa ser analisada por um responsável técnico", 403);
+    }
+    if (isManagerApproval && !["GESTOR", "ADMINISTRADOR"].includes(currentUser.role)) {
+      throw new AppError("Esta solicitação precisa ser aprovada por um gestor", 403);
+    }
+
+    const environment = await environmentRepository.findById(reservation.environmentId);
+    const requiresManagerApproval = environment?.rules[0]?.requiresApproval ?? true;
+    const nextStatus = isTechnicalReview && requiresManagerApproval && currentUser.role !== "ADMINISTRADOR"
+      ? "PENDENTE_APROVACAO"
+      : "APROVADA";
+
     const updated = await reservationRepository.update(id, {
-      status: "APROVADA",
+      status: nextStatus,
       approvedBy: { connect: { id: currentUser.id } },
     });
 
@@ -386,8 +406,17 @@ export const reservationService = {
 
   reject: async (currentUser: CurrentUser, id: string, reason: string) => {
     const reservation = await reservationService.getById(id);
-    if (!["PENDENTE_APROVACAO", "PENDENTE_ANALISE_TECNICA"].includes(reservation.status)) {
+    const isTechnicalReview = reservation.status === "PENDENTE_ANALISE_TECNICA";
+    const isManagerApproval = reservation.status === "PENDENTE_APROVACAO";
+    if (!isTechnicalReview && !isManagerApproval) {
       throw new AppError("Reserva não está pendente de aprovação", 400);
+    }
+
+    if (isTechnicalReview && !["RESPONSAVEL_TECNICO", "ADMINISTRADOR"].includes(currentUser.role)) {
+      throw new AppError("Esta solicitação precisa ser analisada por um responsável técnico", 403);
+    }
+    if (isManagerApproval && !["GESTOR", "ADMINISTRADOR"].includes(currentUser.role)) {
+      throw new AppError("Esta solicitação precisa ser aprovada por um gestor", 403);
     }
 
     const updated = await reservationRepository.update(id, {
@@ -519,10 +548,10 @@ export const reservationService = {
     const reservation = await reservationService.getById(id);
     if (reservation.status !== "APROVADA") return reservation;
 
-    const now = new Date();
-    const minutesLate = minutesBetween(reservation.startTime, now);
-    if (now > reservation.startTime && minutesLate > appEnv.checkinToleranceMinutes) {
-      const updated = await reservationRepository.update(id, { status: "NO_SHOW" });
+    const cutoff = new Date(Date.now() - appEnv.checkinToleranceMinutes * 60000);
+    if (reservation.startTime <= cutoff) {
+      const updated = await reservationRepository.markNoShowIfApproved(id);
+      if (!updated) return reservationService.getById(id);
       await registerAudit({
         action: "NO_SHOW",
         entity: "Reservation",
@@ -533,5 +562,14 @@ export const reservationService = {
       return updated;
     }
     return reservation;
+  },
+
+  markExpiredNoShows: async () => {
+    const cutoff = new Date(Date.now() - appEnv.checkinToleranceMinutes * 60000);
+    const overdue = await reservationRepository.findOverdueApproved(cutoff);
+    for (const reservation of overdue) {
+      await reservationService.markNoShowIfExpired(reservation.id);
+    }
+    return overdue.length;
   },
 };
